@@ -1,5 +1,6 @@
 import asyncio
 
+# --- EVENT LOOP FIX ---
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
@@ -19,7 +20,7 @@ API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAGZ1I0ZLesk3DIZw-IVCtliPLd4O9HVFAA"
 BIN_CHANNEL = -1002521835919
 
-# 👉 YAHAN APNI TELEGRAM USER ID DAALNA (Without Quotes)
+# 👉 APNI TELEGRAM USER ID DAALNA (Admin Commands ke liye)
 ADMIN_ID = 8676822109 
 
 WEB_URL = os.environ.get("WEB_URL", "https://hostry-svg.onrender.com/") 
@@ -32,11 +33,19 @@ def format_size(bytes_size):
         return f"{bytes_size / (1024 * 1024 * 1024):.2f} GB"
     return f"{bytes_size / (1024 * 1024):.2f} MB"
 
+def get_mime_type(filename):
+    filename = filename.lower()
+    if filename.endswith(".mkv"): return "video/x-matroska"
+    if filename.endswith(".mp4"): return "video/mp4"
+    if filename.endswith(".webm"): return "video/webm"
+    if filename.endswith(".avi"): return "video/x-msvideo"
+    return "application/octet-stream"
+
 # ---- BOT COMMANDS LOGIC ----
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start_msg(client: Client, message: Message):
-    await add_user(message.from_user.id) # User ko DB me save karo
+    await add_user(message.from_user.id)
     text = (
         "👋 Hello Bhai!\n\n"
         "Main ek **Ultra-Fast Stream Bot** hoon.\n"
@@ -49,8 +58,7 @@ async def start_msg(client: Client, message: Message):
 async def bot_stats(client: Client, message: Message):
     msg = await message.reply("Fetching stats...")
     users, files = await get_stats()
-    text = f"📊 **Bot Stats**\n\n👥 Total Users: `{users}`\n📂 Total Files: `{files}`"
-    await msg.edit(text)
+    await msg.edit(f"📊 **Bot Stats**\n\n👥 Total Users: `{users}`\n📂 Total Files: `{files}`")
 
 @bot.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
 async def broadcast_msg(client: Client, message: Message):
@@ -65,11 +73,11 @@ async def broadcast_msg(client: Client, message: Message):
         try:
             await message.reply_to_message.copy(user["_id"])
             success += 1
-            await asyncio.sleep(0.1) # Flood control (TG Limits bachane ke liye)
+            await asyncio.sleep(0.1)
         except:
             failed += 1
             
-    await msg.edit(f"✅ **Broadcast Complete!**\n\n🟢 Success: `{success}`\n🔴 Failed (Blocked bot): `{failed}`")
+    await msg.edit(f"✅ **Broadcast Complete!**\n\n🟢 Success: `{success}`\n🔴 Failed: `{failed}`")
 
 @bot.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_files(client: Client, message: Message):
@@ -77,6 +85,7 @@ async def handle_files(client: Client, message: Message):
     msg = await message.reply_text("⏳ Processing your file...")
     
     try:
+        # File forward
         forwarded_msg = await message.forward(BIN_CHANNEL)
         message_id = forwarded_msg.id
         unique_id = uuid.uuid4().hex[:12]
@@ -115,6 +124,7 @@ async def watch_handler(request):
     
     safe_file_name = urllib.parse.quote(file_name)
     stream_url = f"/dl/{safe_file_name}?id={unique_id}"
+    mime_type = get_mime_type(file_name)
     
     html_content = f"""
     <!DOCTYPE html>
@@ -139,7 +149,7 @@ async def watch_handler(request):
         <div class="player-container">
             <h3>{file_name}</h3>
             <video controls controlsList="nodownload">
-                <source src="{stream_url}" type="video/mp4">
+                <source src="{stream_url}" type="{mime_type}">
             </video>
             <div class="buttons">
                 <a href="{stream_url}" class="btn dl-btn" download>⬇️ Download</a>
@@ -171,8 +181,9 @@ async def stream_handler(request):
             return web.Response(text="❌ File format not supported!", status=404)
 
         file_size = file.file_size
+        mime_type = get_mime_type(file_name)
         
-        # --- MAGIC PART: HTTP RANGE SUPPORT FOR SMOOTH SEEKING ---
+        # --- RANGE REQUESTS FOR MX PLAYER / VLC ---
         range_header = request.headers.get("Range")
         start = 0
         end = file_size - 1
@@ -184,22 +195,25 @@ async def stream_handler(request):
                 start = int(match.group(1))
                 if match.group(2):
                     end = int(match.group(2))
-                status = 206 # Partial Content Status
+                status = 206 
 
         limit = end - start + 1
+
+        # Force download header only if path contains /dl/ and range is not requested
+        # Range requests se MX Player smoothly play karega
+        disposition = f'attachment; filename="{file_name}"' if "dl" in request.path and not range_header else f'inline; filename="{file_name}"'
 
         headers = {
             "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Accept-Ranges": "bytes",
             "Content-Length": str(limit),
-            "Content-Type": "video/mp4" if "watch" in request.path else "application/octet-stream",
-            "Content-Disposition": f'inline; filename="{file_name}"' if "watch" in request.path else f'attachment; filename="{file_name}"'
+            "Content-Type": mime_type,
+            "Content-Disposition": disposition
         }
 
         response = web.StreamResponse(status=status, headers=headers)
         await response.prepare(request)
 
-        # Telegram chunk size is 1MB (1048576 bytes)
         chunk_size = 1048576 
         offset_chunk = start // chunk_size
         skip_bytes = start % chunk_size
@@ -219,19 +233,29 @@ async def stream_handler(request):
                 await response.write(chunk)
                 limit -= len(chunk)
         except asyncio.CancelledError:
-            pass # User ne player band kar diya
+            pass # Client disconnected (Normal when seeking)
             
         return response
 
     except Exception as e:
-        print(f"Server Error: {e}")
-        return web.Response(text="❌ Internal Server Error", status=500)
+        print(f"Stream Error: {e}")
+        return web.Response(text="❌ Server Error: File access failed.", status=500)
 
 # ---- APP RUNNER ----
 async def start_services():
     await bot.start()
     print("Bot Started Successfully!")
     
+    # 🚨 MAGIC FIX FOR PEER_ID_INVALID 🚨
+    print("Caching Channel Data to prevent PeerIdInvalid...")
+    try:
+        # Yeh bot ko uske saare groups/channels yaad dilayega restart par
+        async for dialog in bot.get_dialogs():
+            pass 
+        await bot.send_message(BIN_CHANNEL, "✅ Bot Restarted & Connected!")
+    except Exception as e:
+        print(f"⚠️ Channel Cache Error (Make sure bot is admin): {e}")
+
     app = web.Application()
     app.router.add_get('/watch/{filename}', watch_handler)
     app.router.add_get('/dl/{filename}', stream_handler)
