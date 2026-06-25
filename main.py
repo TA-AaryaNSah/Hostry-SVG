@@ -1,26 +1,28 @@
 import asyncio
 
-# --- PERFECT EVENT LOOP FIX FOR PYTHON 3.14 ---
-# Pura system ab strictly is ek hi loop par chalega
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
 import os
+import re
 import math
 import uuid
 import urllib.parse
 from aiohttp import web
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from database import save_file, get_file
+from database import save_file, get_file, add_user, get_all_users, get_stats
 
-# --- TERE HARDCODED CREDENTIALS ---
+# --- TERE CREDENTIALS ---
 API_ID = 32541562
 API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAGZ1I0ZLesk3DIZw-IVCtliPLd4O9HVFAA"
 BIN_CHANNEL = -1002521835919
 
-WEB_URL = os.environ.get("WEB_URL", "https://hostry-svg.onrender.com") 
+# 👉 YAHAN APNI TELEGRAM USER ID DAALNA (Without Quotes)
+ADMIN_ID = 8676822109 
+
+WEB_URL = os.environ.get("WEB_URL", "https://hostry-svg.onrender.com/") 
 PORT = int(os.environ.get("PORT", 8080))
 
 bot = Client("StreamBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -30,20 +32,48 @@ def format_size(bytes_size):
         return f"{bytes_size / (1024 * 1024 * 1024):.2f} GB"
     return f"{bytes_size / (1024 * 1024):.2f} MB"
 
-# ---- START COMMAND LOGIC ----
+# ---- BOT COMMANDS LOGIC ----
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start_msg(client: Client, message: Message):
+    await add_user(message.from_user.id) # User ko DB me save karo
     text = (
         "👋 Hello Bhai!\n\n"
-        "Main ek **File to Link Stream Bot** hoon.\n"
-        "Mujhe koi bhi Video, Audio ya Document bhej, aur main tujhe uska Instant Download aur Watch Link bana kar dunga.\n\n"
+        "Main ek **Ultra-Fast Stream Bot** hoon.\n"
+        "Mujhe koi bhi Video bhej, aur main tujhe uska Instant Download & Watch Link bana kar dunga (Supports MX Player / VLC).\n\n"
         "Bhej koi video check karne ke liye! 🚀"
     )
     await message.reply_text(text)
 
-# ---- TELEGRAM BOT LOGIC ----
+@bot.on_message(filters.command("stats") & filters.user(ADMIN_ID))
+async def bot_stats(client: Client, message: Message):
+    msg = await message.reply("Fetching stats...")
+    users, files = await get_stats()
+    text = f"📊 **Bot Stats**\n\n👥 Total Users: `{users}`\n📂 Total Files: `{files}`"
+    await msg.edit(text)
+
+@bot.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
+async def broadcast_msg(client: Client, message: Message):
+    if not message.reply_to_message:
+        return await message.reply("❌ Kisi message ko reply karke `/broadcast` likho!")
+    
+    msg = await message.reply("⏳ Broadcasting...")
+    users = await get_all_users()
+    success, failed = 0, 0
+    
+    for user in users:
+        try:
+            await message.reply_to_message.copy(user["_id"])
+            success += 1
+            await asyncio.sleep(0.1) # Flood control (TG Limits bachane ke liye)
+        except:
+            failed += 1
+            
+    await msg.edit(f"✅ **Broadcast Complete!**\n\n🟢 Success: `{success}`\n🔴 Failed (Blocked bot): `{failed}`")
+
 @bot.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_files(client: Client, message: Message):
+    await add_user(message.from_user.id)
     msg = await message.reply_text("⏳ Processing your file...")
     
     try:
@@ -73,7 +103,6 @@ async def handle_files(client: Client, message: Message):
         await msg.edit_text(text, disable_web_page_preview=True)
         
     except Exception as e:
-        print(f"Error handling file: {e}") 
         await msg.edit_text(f"❌ Error aagaya bhai: `{e}`")
 
 # ---- WEB SERVER: HTML PLAYER LOGIC ----
@@ -95,23 +124,15 @@ async def watch_handler(request):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{file_name}</title>
         <style>
-            body {{
-                margin: 0; padding: 0; background-color: #0f0f0f;
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
-                height: 100vh; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }}
-            .player-container {{
-                width: 90%; max-width: 850px; background: #1a1a1a;
-                padding: 15px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-            }}
+            body {{ margin: 0; padding: 0; background-color: #0f0f0f; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: #fff; font-family: sans-serif; }}
+            .player-container {{ width: 90%; max-width: 850px; background: #1a1a1a; padding: 15px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }}
             h3 {{ margin-top: 0; font-size: 16px; word-wrap: break-word; color: #ccc; text-align: center; }}
             video {{ width: 100%; border-radius: 8px; outline: none; background: #000; }}
-            .download-btn {{
-                display: block; width: max-content; margin: 15px auto 0;
-                padding: 10px 20px; background: #0088cc; color: white;
-                text-decoration: none; border-radius: 6px; font-weight: bold; transition: 0.3s;
-            }}
-            .download-btn:hover {{ background: #006699; }}
+            .buttons {{ display: flex; justify-content: center; gap: 15px; margin-top: 15px; flex-wrap: wrap; }}
+            .btn {{ padding: 10px 20px; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; transition: 0.3s; text-align: center; }}
+            .dl-btn {{ background: #0088cc; }} .dl-btn:hover {{ background: #006699; }}
+            .mx-btn {{ background: #0055ff; }} .mx-btn:hover {{ background: #0044cc; }}
+            .vlc-btn {{ background: #ff8800; }} .vlc-btn:hover {{ background: #cc6600; }}
         </style>
     </head>
     <body>
@@ -119,16 +140,19 @@ async def watch_handler(request):
             <h3>{file_name}</h3>
             <video controls controlsList="nodownload">
                 <source src="{stream_url}" type="video/mp4">
-                Your browser does not support HTML video.
             </video>
-            <a href="{stream_url}" class="download-btn" download>⬇️ Download File</a>
+            <div class="buttons">
+                <a href="{stream_url}" class="btn dl-btn" download>⬇️ Download</a>
+                <a href="intent:{stream_url}#Intent;package=com.mxtech.videoplayer.ad;S.title={file_name};end" class="btn mx-btn">📺 Play in MX Player</a>
+                <a href="vlc://{stream_url}" class="btn vlc-btn">🧡 Play in VLC</a>
+            </div>
         </div>
     </body>
     </html>
     """
     return web.Response(text=html_content, content_type="text/html")
 
-# ---- WEB SERVER: STREAMING / DOWNLOAD LOGIC ----
+# ---- WEB SERVER: FAST STREAMING LOGIC WITH SEEK SUPPORT ----
 async def stream_handler(request):
     try:
         file_name = request.match_info.get("filename", "video.mp4")
@@ -143,24 +167,59 @@ async def stream_handler(request):
             
         msg = await bot.get_messages(BIN_CHANNEL, message_id)
         file = msg.document or msg.video or msg.audio
-        
         if not file:
             return web.Response(text="❌ File format not supported!", status=404)
 
         file_size = file.file_size
         
+        # --- MAGIC PART: HTTP RANGE SUPPORT FOR SMOOTH SEEKING ---
+        range_header = request.headers.get("Range")
+        start = 0
+        end = file_size - 1
+        status = 200
+
+        if range_header:
+            match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+            if match:
+                start = int(match.group(1))
+                if match.group(2):
+                    end = int(match.group(2))
+                status = 206 # Partial Content Status
+
+        limit = end - start + 1
+
         headers = {
-            "Content-Type": "application/octet-stream" if "dl" in request.path else "video/mp4",
-            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Accept-Ranges": "bytes",
+            "Content-Length": str(limit),
+            "Content-Type": "video/mp4" if "watch" in request.path else "application/octet-stream",
+            "Content-Disposition": f'inline; filename="{file_name}"' if "watch" in request.path else f'attachment; filename="{file_name}"'
         }
 
-        response = web.StreamResponse(status=200, headers=headers)
-        response.content_length = file_size
+        response = web.StreamResponse(status=status, headers=headers)
         await response.prepare(request)
 
-        async for chunk in bot.stream_media(msg):
-            await response.write(chunk)
+        # Telegram chunk size is 1MB (1048576 bytes)
+        chunk_size = 1048576 
+        offset_chunk = start // chunk_size
+        skip_bytes = start % chunk_size
+
+        try:
+            async for chunk in bot.stream_media(msg, offset=offset_chunk):
+                if skip_bytes:
+                    chunk = chunk[skip_bytes:]
+                    skip_bytes = 0
+                
+                if limit <= 0:
+                    break
+                    
+                if len(chunk) > limit:
+                    chunk = chunk[:limit]
+                    
+                await response.write(chunk)
+                limit -= len(chunk)
+        except asyncio.CancelledError:
+            pass # User ne player band kar diya
             
         return response
 
@@ -186,5 +245,4 @@ async def start_services():
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    # Naya fix: Ab hum ussi loop ko use kar rahe hain jo upar banaya tha!
     loop.run_until_complete(start_services())
