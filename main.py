@@ -1,10 +1,9 @@
 import asyncio
 
-# --- FIX FOR PYTHON ASYNCIO ERROR ---
-try:
-    asyncio.get_event_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
+# --- PERFECT EVENT LOOP FIX FOR PYTHON 3.14 ---
+# Pura system ab strictly is ek hi loop par chalega
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 import os
 import math
@@ -21,7 +20,7 @@ API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAGZ1I0ZLesk3DIZw-IVCtliPLd4O9HVFAA"
 BIN_CHANNEL = -1002521835919
 
-WEB_URL = os.environ.get("WEB_URL", "https://your-app-name.onrender.com") 
+WEB_URL = os.environ.get("WEB_URL", "https://hostry-svg.onrender.com") 
 PORT = int(os.environ.get("PORT", 8080))
 
 bot = Client("StreamBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -31,7 +30,7 @@ def format_size(bytes_size):
         return f"{bytes_size / (1024 * 1024 * 1024):.2f} GB"
     return f"{bytes_size / (1024 * 1024):.2f} MB"
 
-# ---- NEW: START COMMAND LOGIC ----
+# ---- START COMMAND LOGIC ----
 @bot.on_message(filters.command("start") & filters.private)
 async def start_msg(client: Client, message: Message):
     text = (
@@ -48,12 +47,10 @@ async def handle_files(client: Client, message: Message):
     msg = await message.reply_text("⏳ Processing your file...")
     
     try:
-        # File forward aur DB save
         forwarded_msg = await message.forward(BIN_CHANNEL)
         message_id = forwarded_msg.id
         unique_id = uuid.uuid4().hex[:12]
         
-        # Saving to MongoDB
         await save_file(unique_id, message_id)
         
         file = message.document or message.video or message.audio
@@ -76,7 +73,7 @@ async def handle_files(client: Client, message: Message):
         await msg.edit_text(text, disable_web_page_preview=True)
         
     except Exception as e:
-        print(f"Error handling file: {e}") # Render logs me error print karega
+        print(f"Error handling file: {e}") 
         await msg.edit_text(f"❌ Error aagaya bhai: `{e}`")
 
 # ---- WEB SERVER: HTML PLAYER LOGIC ----
@@ -189,4 +186,5 @@ async def start_services():
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    asyncio.run(start_services())
+    # Naya fix: Ab hum ussi loop ko use kar rahe hain jo upar banaya tha!
+    loop.run_until_complete(start_services())
