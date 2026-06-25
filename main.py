@@ -1,9 +1,19 @@
+import asyncio
+
+# --- FIX FOR PYTHON ASYNCIO ERROR ---
+# Pyrogram ko import karne se pehle humein event loop manually set karna hoga
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 import os
 import math
 import uuid
-import asyncio
 import urllib.parse
 from aiohttp import web
+
+# Ab Pyrogram safely import ho jayega
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from database import save_file, get_file
