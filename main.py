@@ -1,7 +1,6 @@
 import asyncio
 
 # --- FIX FOR PYTHON ASYNCIO ERROR ---
-# Pyrogram ko import karne se pehle humein event loop manually set karna hoga
 try:
     asyncio.get_event_loop()
 except RuntimeError:
@@ -12,8 +11,6 @@ import math
 import uuid
 import urllib.parse
 from aiohttp import web
-
-# Ab Pyrogram safely import ho jayega
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from database import save_file, get_file
@@ -24,7 +21,6 @@ API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAGZ1I0ZLesk3DIZw-IVCtliPLd4O9HVFAA"
 BIN_CHANNEL = -1002521835919
 
-# Yeh tujhe Render pe dalna padega, ya URL milne ke baad yahan hardcode kar dena
 WEB_URL = os.environ.get("WEB_URL", "https://your-app-name.onrender.com") 
 PORT = int(os.environ.get("PORT", 8080))
 
@@ -35,21 +31,33 @@ def format_size(bytes_size):
         return f"{bytes_size / (1024 * 1024 * 1024):.2f} GB"
     return f"{bytes_size / (1024 * 1024):.2f} MB"
 
-# ---- TELEGRAM BOT LOGIC ----
+# ---- NEW: START COMMAND LOGIC ----
+@bot.on_message(filters.command("start") & filters.private)
+async def start_msg(client: Client, message: Message):
+    text = (
+        "👋 Hello Bhai!\n\n"
+        "Main ek **File to Link Stream Bot** hoon.\n"
+        "Mujhe koi bhi Video, Audio ya Document bhej, aur main tujhe uska Instant Download aur Watch Link bana kar dunga.\n\n"
+        "Bhej koi video check karne ke liye! 🚀"
+    )
+    await message.reply_text(text)
 
+# ---- TELEGRAM BOT LOGIC ----
 @bot.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_files(client: Client, message: Message):
-    msg = await message.reply_text("⏳ Processing...")
+    msg = await message.reply_text("⏳ Processing your file...")
     
     try:
         # File forward aur DB save
         forwarded_msg = await message.forward(BIN_CHANNEL)
         message_id = forwarded_msg.id
         unique_id = uuid.uuid4().hex[:12]
+        
+        # Saving to MongoDB
         await save_file(unique_id, message_id)
         
         file = message.document or message.video or message.audio
-        file_name = getattr(file, "file_name", "Video.mp4")
+        file_name = getattr(file, "file_name", "Video_File.mp4")
         file_size = format_size(file.file_size)
         
         safe_file_name = urllib.parse.quote(file_name)
@@ -68,10 +76,10 @@ async def handle_files(client: Client, message: Message):
         await msg.edit_text(text, disable_web_page_preview=True)
         
     except Exception as e:
-        await msg.edit_text(f"❌ Error: {e}")
+        print(f"Error handling file: {e}") # Render logs me error print karega
+        await msg.edit_text(f"❌ Error aagaya bhai: `{e}`")
 
 # ---- WEB SERVER: HTML PLAYER LOGIC ----
-
 async def watch_handler(request):
     file_name = request.match_info.get("filename", "Video")
     unique_id = request.query.get("id")
@@ -124,7 +132,6 @@ async def watch_handler(request):
     return web.Response(text=html_content, content_type="text/html")
 
 # ---- WEB SERVER: STREAMING / DOWNLOAD LOGIC ----
-
 async def stream_handler(request):
     try:
         file_name = request.match_info.get("filename", "video.mp4")
@@ -165,10 +172,9 @@ async def stream_handler(request):
         return web.Response(text="❌ Internal Server Error", status=500)
 
 # ---- APP RUNNER ----
-
 async def start_services():
     await bot.start()
-    print("Bot Started!")
+    print("Bot Started Successfully!")
     
     app = web.Application()
     app.router.add_get('/watch/{filename}', watch_handler)
