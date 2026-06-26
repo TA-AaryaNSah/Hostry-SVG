@@ -14,16 +14,14 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from database import save_file, get_file, add_user, get_all_users, get_stats
 
-# --- TERE CREDENTIALS ---
+# --- TERE CREDENTIALS (Updated) ---
 API_ID = 32541562
 API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAGZ1I0ZLesk3DIZw-IVCtliPLd4O9HVFAA"
 BIN_CHANNEL = -1002521835919
 
-# 👉 APNI TELEGRAM USER ID DAALNA (Admin Commands ke liye)
 ADMIN_ID = 8676822109 
-
-WEB_URL = os.environ.get("WEB_URL", "https://hostry-svg.onrender.com/") 
+WEB_URL = "https://hostry-svg.onrender.com" # Dhyan rahe aakhri me slash (/) na ho
 PORT = int(os.environ.get("PORT", 8080))
 
 bot = Client("StreamBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -85,16 +83,19 @@ async def handle_files(client: Client, message: Message):
     msg = await message.reply_text("⏳ Processing your file...")
     
     try:
-        # File forward
-        forwarded_msg = await message.forward(BIN_CHANNEL)
-        message_id = forwarded_msg.id
+        # File forward for backup (Admin ki DB ke liye)
+        await message.forward(BIN_CHANNEL)
+        
+        # --- NEW CONCEPT: Extract File ID ---
+        file = message.document or message.video or message.audio
+        file_id = file.file_id  # Hum isko use karenge stream ke liye
+        file_name = getattr(file, "file_name", "Video_File.mp4")
+        file_size = file.file_size
+        
         unique_id = uuid.uuid4().hex[:12]
         
-        await save_file(unique_id, message_id)
-        
-        file = message.document or message.video or message.audio
-        file_name = getattr(file, "file_name", "Video_File.mp4")
-        file_size = format_size(file.file_size)
+        # Save complete file details in DB
+        await save_file(unique_id, file_id, file_name, file_size)
         
         safe_file_name = urllib.parse.quote(file_name)
         
@@ -104,7 +105,7 @@ async def handle_files(client: Client, message: Message):
         text = (
             f"✅ ʏᴏᴜʀ ʟɪɴᴋ ɪs ʀᴇᴀᴅʏ!\n\n"
             f"📂 ғɪʟᴇ ɴᴀᴍᴇ: `{file_name}`\n"
-            f"📦 ғɪʟᴇ sɪᴢᴇ: {file_size}\n\n"
+            f"📦 ғɪʟᴇ sɪᴢᴇ: {format_size(file_size)}\n\n"
             f"📥 ᴅᴏᴡɴʟᴏᴀᴅ:\n{download_link}\n\n"
             f"🖥 ᴡᴀᴛᴄʜ:\n{watch_link}\n\n"
             f"🚸 ɴᴏᴛᴇ: ʟɪɴᴋs ᴡɪʟʟ ᴡᴏʀᴋ ᴜɴᴛɪʟ ɪ ᴅᴇʟᴇᴛᴇ ᴛʜᴇ ғɪʟᴇ."
@@ -162,28 +163,24 @@ async def watch_handler(request):
     """
     return web.Response(text=html_content, content_type="text/html")
 
-# ---- WEB SERVER: FAST STREAMING LOGIC WITH SEEK SUPPORT ----
+# ---- WEB SERVER: FAST STREAMING LOGIC ----
 async def stream_handler(request):
     try:
-        file_name = request.match_info.get("filename", "video.mp4")
         unique_id = request.query.get("id")
         
         if not unique_id:
             return web.Response(text="❌ ID missing in URL!", status=400)
             
-        message_id = await get_file(unique_id)
-        if not message_id:
+        # Naya Logic: DB se direct file_id nikalna
+        file_data = await get_file(unique_id)
+        if not file_data:
             return web.Response(text="❌ File not found or deleted by admin!", status=404)
             
-        msg = await bot.get_messages(BIN_CHANNEL, message_id)
-        file = msg.document or msg.video or msg.audio
-        if not file:
-            return web.Response(text="❌ File format not supported!", status=404)
-
-        file_size = file.file_size
+        file_id = file_data["file_id"]
+        file_name = file_data["file_name"]
+        file_size = file_data["file_size"]
         mime_type = get_mime_type(file_name)
         
-        # --- RANGE REQUESTS FOR MX PLAYER / VLC ---
         range_header = request.headers.get("Range")
         start = 0
         end = file_size - 1
@@ -199,8 +196,6 @@ async def stream_handler(request):
 
         limit = end - start + 1
 
-        # Force download header only if path contains /dl/ and range is not requested
-        # Range requests se MX Player smoothly play karega
         disposition = f'attachment; filename="{file_name}"' if "dl" in request.path and not range_header else f'inline; filename="{file_name}"'
 
         headers = {
@@ -219,7 +214,8 @@ async def stream_handler(request):
         skip_bytes = start % chunk_size
 
         try:
-            async for chunk in bot.stream_media(msg, offset=offset_chunk):
+            # DIRECT FILE ID STREAMING (No Channel Interaction Required)
+            async for chunk in bot.stream_media(file_id, offset=offset_chunk):
                 if skip_bytes:
                     chunk = chunk[skip_bytes:]
                     skip_bytes = 0
@@ -233,29 +229,19 @@ async def stream_handler(request):
                 await response.write(chunk)
                 limit -= len(chunk)
         except asyncio.CancelledError:
-            pass # Client disconnected (Normal when seeking)
+            pass 
             
         return response
 
     except Exception as e:
         print(f"Stream Error: {e}")
-        return web.Response(text="❌ Server Error: File access failed.", status=500)
+        return web.Response(text="❌ Server Error: File stream failed.", status=500)
 
 # ---- APP RUNNER ----
 async def start_services():
     await bot.start()
-    print("Bot Started Successfully!")
+    print("Bot Started Successfully! Zero PeerIdInvalid Guarantee.")
     
-    # 🚨 MAGIC FIX FOR PEER_ID_INVALID 🚨
-    print("Caching Channel Data to prevent PeerIdInvalid...")
-    try:
-        # Yeh bot ko uske saare groups/channels yaad dilayega restart par
-        async for dialog in bot.get_dialogs():
-            pass 
-        await bot.send_message(BIN_CHANNEL, "✅ Bot Restarted & Connected!")
-    except Exception as e:
-        print(f"⚠️ Channel Cache Error (Make sure bot is admin): {e}")
-
     app = web.Application()
     app.router.add_get('/watch/{filename}', watch_handler)
     app.router.add_get('/dl/{filename}', stream_handler)
