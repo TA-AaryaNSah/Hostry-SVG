@@ -1,22 +1,25 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Tera MongoDB URL yahan hardcode kar diya hai
 MONGO_URL = "mongodb+srv://asvm:incorrectasvm@cluster0.v2z8vnw.mongodb.net/?appName=Cluster0"
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client["FileStreamBot"]
-files_col = db["files"]
+
+# Naya collection taaki purane error wale links clash na karein
+files_col = db["files_v2"] 
 users_col = db["users"]
 
-# ---- FILE FUNCTIONS ----
-async def save_file(unique_id, message_id):
-    await files_col.insert_one({"_id": unique_id, "message_id": message_id})
+# ---- FILE FUNCTIONS (Alag Concept: Ab File ID save hoga) ----
+async def save_file(unique_id, file_id, file_name, file_size):
+    await files_col.insert_one({
+        "_id": unique_id, 
+        "file_id": file_id, 
+        "file_name": file_name, 
+        "file_size": file_size
+    })
 
 async def get_file(unique_id):
-    result = await files_col.find_one({"_id": unique_id})
-    if result:
-        return result.get("message_id")
-    return None
+    return await files_col.find_one({"_id": unique_id})
 
 # ---- USER FUNCTIONS ----
 async def add_user(user_id):
