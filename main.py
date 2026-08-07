@@ -17,7 +17,7 @@ from database import save_file, get_file, add_user, get_all_users, get_stats
 # --- TERE CREDENTIALS (Updated) ---
 API_ID = 32541562
 API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
-BOT_TOKEN = "8932447404:AAGZ1I0ZLesk3DIZw-IVCtliPLd4O9HVFAA"
+BOT_TOKEN = "8932447404:AAEnctZD5fzy90BDIVlqV1mmjXnyNb5qoxg"
 BIN_CHANNEL = -1002521835919
 
 ADMIN_ID = 8676822109 
