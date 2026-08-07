@@ -18,7 +18,7 @@ from database import save_file, get_file, add_user, get_all_users, get_stats
 API_ID = 32541562
 API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAEnctZD5fzy90BDIVlqV1mmjXnyNb5qoxg"
-BIN_CHANNEL = -1002521835919
+BIN_CHANNEL = -1003009926889 # <-- Updated Bin Channel ID
 
 ADMIN_ID = 8676822109 
 WEB_URL = "https://hostry-svg-zxen.onrender.com" # Dhyan rahe aakhri me slash (/) na ho
@@ -83,10 +83,14 @@ async def handle_files(client: Client, message: Message):
     msg = await message.reply_text("⏳ Processing your file...")
     
     try:
-        # File forward for backup (Admin ki DB ke liye)
-        await message.forward(BIN_CHANNEL)
+        # File forward for backup (Admin ki DB ke liye) - Added Error Handling
+        try:
+            await message.forward(BIN_CHANNEL)
+        except Exception as fwd_err:
+            print(f"Forward Error: {fwd_err}")
+            return await msg.edit_text("❌ **Error:** Mujhe Bin Channel me Admin banao pehle!")
         
-        # --- NEW CONCEPT: Extract File ID ---
+        # --- Extract File ID ---
         file = message.document or message.video or message.audio
         file_id = file.file_id  # Hum isko use karenge stream ke liye
         file_name = getattr(file, "file_name", "Video_File.mp4")
