@@ -21,7 +21,7 @@ BOT_TOKEN = "8932447404:AAEnctZD5fzy90BDIVlqV1mmjXnyNb5qoxg"
 BIN_CHANNEL = -1003009926889 # <-- Updated Bin Channel ID
 
 ADMIN_ID = 8676822109 
-WEB_URL = "https://hostry-svg-zxen.onrender.com" # Dhyan rahe aakhri me slash (/) na ho
+WEB_URL = "https://www.f2l.xalfh.dpdns.org" # Dhyan rahe aakhri me slash (/) na ho
 PORT = int(os.environ.get("PORT", 8080))
 
 bot = Client("StreamBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
