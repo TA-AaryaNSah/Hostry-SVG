@@ -11,21 +11,51 @@ import uuid
 import urllib.parse
 from aiohttp import web
 from pyrogram import Client, filters
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import UserNotParticipant
+from motor.motor_asyncio import AsyncIOMotorClient
+
 from database import save_file, get_file, add_user, get_all_users, get_stats
 
-# --- TERE CREDENTIALS (Updated) ---
+# --- CREDENTIALS ---
 API_ID = 32541562
 API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
 BOT_TOKEN = "8932447404:AAEnctZD5fzy90BDIVlqV1mmjXnyNb5qoxg"
-BIN_CHANNEL = -1003009926889 # <-- Updated Bin Channel ID
-
+DEFAULT_BIN_CHANNEL = -1003009926889 
 ADMIN_ID = 8676822109 
-WEB_URL = "https://www.f2l.xalfh.dpdns.org" # Dhyan rahe aakhri me slash (/) na ho
+WEB_URL = "https://www.f2l.xalfh.dpdns.org" # No trailing slash
 PORT = int(os.environ.get("PORT", 8080))
+MONGO_URI = "mongodb+srv://aaryansah954:QgDQRgyD7VUa7Eho@cluster0.wjo9zfm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 
 bot = Client("StreamBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+# --- DYNAMIC SETTINGS DB ---
+db_client = AsyncIOMotorClient(MONGO_URI)
+settings_db = db_client["stream_bot"]["settings"]
+
+async def get_fsub():
+    data = await settings_db.find_one({"_id": "fsub"})
+    return data if data else {"link": None, "channel_id": None}
+
+async def get_bin():
+    data = await settings_db.find_one({"_id": "bin"})
+    return data["channel_id"] if data else DEFAULT_BIN_CHANNEL
+
+async def check_fsub(client, user_id):
+    fsub = await get_fsub()
+    if not fsub["channel_id"]:
+        return True
+    try:
+        member = await client.get_chat_member(fsub["channel_id"], user_id)
+        if member.status.name in ["LEFT", "BANNED", "KICKED"]:
+            return False
+        return True
+    except UserNotParticipant:
+        return False
+    except Exception:
+        return True # Fallback if bot is not admin in the fsub channel
+
+# --- UTILS ---
 def format_size(bytes_size):
     if bytes_size >= 1024 * 1024 * 1024:
         return f"{bytes_size / (1024 * 1024 * 1024):.2f} GB"
@@ -45,25 +75,54 @@ def get_mime_type(filename):
 async def start_msg(client: Client, message: Message):
     await add_user(message.from_user.id)
     text = (
-        "👋 Hello Bhai!\n\n"
-        "Main ek **Ultra-Fast Stream Bot** hoon.\n"
-        "Mujhe koi bhi Video bhej, aur main tujhe uska Instant Download & Watch Link bana kar dunga (Supports MX Player / VLC).\n\n"
-        "Bhej koi video check karne ke liye! 🚀"
+        "👋 **Hello! Welcome to the Fast Stream Bot.**\n\n"
+        "I can instantly convert your Telegram videos and files into **High-Speed Download & Streaming Links**.\n\n"
+        "🚀 **Simply forward or send any video/file to get started!**"
     )
     await message.reply_text(text)
 
+@bot.on_message(filters.command("add_bin") & filters.user(ADMIN_ID))
+async def add_bin_cmd(client: Client, message: Message):
+    if len(message.command) < 2:
+        return await message.reply("⚠️ **Usage:** `/add_bin -100xxxxxxxx`")
+    try:
+        new_bin = int(message.command[1])
+        await settings_db.update_one({"_id": "bin"}, {"$set": {"channel_id": new_bin}}, upsert=True)
+        await message.reply(f"✅ **BIN Channel successfully updated to:** `{new_bin}`")
+    except ValueError:
+        await message.reply("❌ **Invalid Channel ID format!**")
+
+@bot.on_message(filters.command("fsub") & filters.user(ADMIN_ID))
+async def set_fsub_cmd(client: Client, message: Message):
+    if len(message.command) < 3:
+        return await message.reply("⚠️ **Usage:** `/fsub https://t.me/yourlink -100xxxxxxxx`\n\nTo disable FSub, use: `/fsub off off`")
+    
+    link = message.command[1]
+    channel_id = message.command[2]
+    
+    if link.lower() == "off":
+        await settings_db.update_one({"_id": "fsub"}, {"$set": {"link": None, "channel_id": None}}, upsert=True)
+        return await message.reply("✅ **Force Subscribe has been Disabled!**")
+        
+    try:
+        channel_id = int(channel_id)
+        await settings_db.update_one({"_id": "fsub"}, {"$set": {"link": link, "channel_id": channel_id}}, upsert=True)
+        await message.reply(f"✅ **Force Subscribe successfully activated!**\n\n🔗 **Link:** {link}\n🆔 **Channel ID:** `{channel_id}`")
+    except ValueError:
+        await message.reply("❌ **Invalid Channel ID format!**")
+
 @bot.on_message(filters.command("stats") & filters.user(ADMIN_ID))
 async def bot_stats(client: Client, message: Message):
-    msg = await message.reply("Fetching stats...")
+    msg = await message.reply("⏳ Fetching stats...")
     users, files = await get_stats()
-    await msg.edit(f"📊 **Bot Stats**\n\n👥 Total Users: `{users}`\n📂 Total Files: `{files}`")
+    await msg.edit(f"📊 **Database Analytics**\n\n👥 Total Users: `{users}`\n📂 Total Files: `{files}`")
 
 @bot.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
 async def broadcast_msg(client: Client, message: Message):
     if not message.reply_to_message:
-        return await message.reply("❌ Kisi message ko reply karke `/broadcast` likho!")
+        return await message.reply("❌ Reply to a message with `/broadcast` to send it to all users.")
     
-    msg = await message.reply("⏳ Broadcasting...")
+    msg = await message.reply("⏳ Broadcasting message...")
     users = await get_all_users()
     success, failed = 0, 0
     
@@ -75,60 +134,81 @@ async def broadcast_msg(client: Client, message: Message):
         except:
             failed += 1
             
-    await msg.edit(f"✅ **Broadcast Complete!**\n\n🟢 Success: `{success}`\n🔴 Failed: `{failed}`")
+    await msg.edit(f"✅ **Broadcast Complete!**\n\n🟢 Successful: `{success}`\n🔴 Failed: `{failed}`")
 
 @bot.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_files(client: Client, message: Message):
     await add_user(message.from_user.id)
-    msg = await message.reply_text("⏳ Processing your file...")
+    
+    # 1. Check Force Subscribe
+    fsub = await get_fsub()
+    if fsub["channel_id"]:
+        is_participant = await check_fsub(client, message.from_user.id)
+        if not is_participant:
+            btn = [[InlineKeyboardButton("📢 Join Updates Channel", url=fsub["link"])]]
+            return await message.reply(
+                "❌ **Access Denied!**\n\nYou must join our official channel to use this bot. Join now and try sending the file again.", 
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
+
+    msg = await message.reply_text("⏳ Generating secure hash link...")
     
     try:
-        # File forward for backup (Admin ki DB ke liye) - Added Error Handling
+        # 2. Forward to BIN Channel (Silently ignore errors for user)
+        bin_id = await get_bin()
         try:
-            await message.forward(BIN_CHANNEL)
+            await message.forward(bin_id)
         except Exception as fwd_err:
-            print(f"Forward Error: {fwd_err}")
-            return await msg.edit_text("❌ **Error:** Mujhe Bin Channel me Admin banao pehle!")
+            print(f"Failed to forward to BIN: {fwd_err}")
+            pass 
         
-        # --- Extract File ID ---
+        # 3. Process File Details
         file = message.document or message.video or message.audio
-        file_id = file.file_id  # Hum isko use karenge stream ke liye
+        file_id = file.file_id  
         file_name = getattr(file, "file_name", "Video_File.mp4")
         file_size = file.file_size
         
-        unique_id = uuid.uuid4().hex[:12]
+        # Generate short unique hash
+        hash_val = uuid.uuid4().hex[:8]
         
-        # Save complete file details in DB
-        await save_file(unique_id, file_id, file_name, file_size)
+        # Save to DB
+        await save_file(hash_val, file_id, file_name, file_size)
         
         safe_file_name = urllib.parse.quote(file_name)
         
-        download_link = f"{WEB_URL}/dl/{safe_file_name}?id={unique_id}"
-        watch_link = f"{WEB_URL}/watch/{safe_file_name}?id={unique_id}"
+        # Exact Requested URL Format
+        download_link = f"{WEB_URL}/{hash_val}/{safe_file_name}?hash={hash_val}"
+        watch_link = f"{WEB_URL}/watch/{hash_val}/{safe_file_name}?hash={hash_val}"
         
         text = (
-            f"✅ ʏᴏᴜʀ ʟɪɴᴋ ɪs ʀᴇᴀᴅʏ!\n\n"
-            f"📂 ғɪʟᴇ ɴᴀᴍᴇ: `{file_name}`\n"
-            f"📦 ғɪʟᴇ sɪᴢᴇ: {format_size(file_size)}\n\n"
-            f"📥 ᴅᴏᴡɴʟᴏᴀᴅ:\n{download_link}\n\n"
-            f"🖥 ᴡᴀᴛᴄʜ:\n{watch_link}\n\n"
-            f"🚸 ɴᴏᴛᴇ: ʟɪɴᴋs ᴡɪʟʟ ᴡᴏʀᴋ ᴜɴᴛɪʟ ɪ ᴅᴇʟᴇᴛᴇ ᴛʜᴇ ғɪʟᴇ."
+            f"✅ **Link Successfully Generated!**\n\n"
+            f"📂 **File Name:** `{file_name}`\n"
+            f"📦 **Size:** `{format_size(file_size)}`\n\n"
+            f"📥 **Download Link:**\n`{download_link}`\n\n"
+            f"🖥 **Watch Online:**\n`{watch_link}`"
         )
-        await msg.edit_text(text, disable_web_page_preview=True)
+        
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬇️ Download Link", url=download_link), InlineKeyboardButton("📺 Watch Online", url=watch_link)]
+        ])
+        
+        await msg.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
         
     except Exception as e:
-        await msg.edit_text(f"❌ Error aagaya bhai: `{e}`")
+        await msg.edit_text(f"❌ **An Error Occurred:** `{e}`")
 
 # ---- WEB SERVER: HTML PLAYER LOGIC ----
 async def watch_handler(request):
     file_name = request.match_info.get("filename", "Video")
-    unique_id = request.query.get("id")
+    hash_val = request.match_info.get("hash")
+    query_hash = request.query.get("hash")
     
-    if not unique_id:
-        return web.Response(text="❌ Invalid Link: ID is missing!", status=400)
+    final_hash = hash_val or query_hash
+    if not final_hash:
+        return web.Response(text="❌ Invalid Link: Hash is missing!", status=400)
     
     safe_file_name = urllib.parse.quote(file_name)
-    stream_url = f"/dl/{safe_file_name}?id={unique_id}"
+    stream_url = f"/{final_hash}/{safe_file_name}?hash={final_hash}"
     mime_type = get_mime_type(file_name)
     
     html_content = f"""
@@ -170,15 +250,16 @@ async def watch_handler(request):
 # ---- WEB SERVER: FAST STREAMING LOGIC ----
 async def stream_handler(request):
     try:
-        unique_id = request.query.get("id")
+        hash_val = request.match_info.get("hash")
+        query_hash = request.query.get("hash")
+        final_hash = hash_val or query_hash
         
-        if not unique_id:
-            return web.Response(text="❌ ID missing in URL!", status=400)
+        if not final_hash:
+            return web.Response(text="❌ Hash missing in URL!", status=400)
             
-        # Naya Logic: DB se direct file_id nikalna
-        file_data = await get_file(unique_id)
+        file_data = await get_file(final_hash)
         if not file_data:
-            return web.Response(text="❌ File not found or deleted by admin!", status=404)
+            return web.Response(text="❌ File not found or link has expired!", status=404)
             
         file_id = file_data["file_id"]
         file_name = file_data["file_name"]
@@ -200,7 +281,7 @@ async def stream_handler(request):
 
         limit = end - start + 1
 
-        disposition = f'attachment; filename="{file_name}"' if "dl" in request.path and not range_header else f'inline; filename="{file_name}"'
+        disposition = f'inline; filename="{file_name}"'
 
         headers = {
             "Content-Range": f"bytes {start}-{end}/{file_size}",
@@ -218,7 +299,6 @@ async def stream_handler(request):
         skip_bytes = start % chunk_size
 
         try:
-            # DIRECT FILE ID STREAMING (No Channel Interaction Required)
             async for chunk in bot.stream_media(file_id, offset=offset_chunk):
                 if skip_bytes:
                     chunk = chunk[skip_bytes:]
@@ -244,11 +324,12 @@ async def stream_handler(request):
 # ---- APP RUNNER ----
 async def start_services():
     await bot.start()
-    print("Bot Started Successfully! Zero PeerIdInvalid Guarantee.")
+    print("Bot Started Successfully! Advanced Features Active.")
     
     app = web.Application()
-    app.router.add_get('/watch/{filename}', watch_handler)
-    app.router.add_get('/dl/{filename}', stream_handler)
+    # Updated Web Routes to match your specific layout
+    app.router.add_get('/watch/{hash}/{filename}', watch_handler)
+    app.router.add_get('/{hash}/{filename}', stream_handler)
     
     runner = web.AppRunner(app)
     await runner.setup()
