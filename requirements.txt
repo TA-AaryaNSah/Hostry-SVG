@@ -1,4 +1,4 @@
-pyrogram
-TgCrypto
-aiohttp
+pyrogram==2.0.106
+tgcrypto
 motor
+aiohttp
