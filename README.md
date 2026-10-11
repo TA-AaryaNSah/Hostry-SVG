@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Hostry-SVG
+# 🚀 Fike-2-Link Bot
 
 ### Telegram File-to-Link & Streaming Bot
 
@@ -365,7 +365,7 @@ If no license file is present, do not assume that unrestricted redistribution is
 
 <div align="center">
 
-# ⭐ Hostry-SVG
+# ⭐ 
 
 **Upload • Link • Stream**
 
