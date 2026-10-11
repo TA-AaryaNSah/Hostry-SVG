@@ -1,14 +1,14 @@
 <div align="center">
 
-# 🚀 Fike-2-Link Bot
+# 🚀 File-2-Link
 
 ### Telegram File-to-Link & Streaming Bot
 
 **Upload • Generate Links • Stream Anywhere**
 
-[![Deploy on Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?name=Hostry-SVG&type=git&repository=TA-AaryaNSah%2FHostry-SVG&branch=main)
+[![Deploy on Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/TA-AaryaNSah/Hostry-SVG)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram)
@@ -50,7 +50,7 @@
 ## 📂 Project Structure
 
 ```text
-Hostry-SVG/
+File-2-Link/
 ├── main.py
 ├── app.py
 ├── database.py
@@ -84,10 +84,7 @@ Before running the project, prepare:
 
 ### 1. Clone Repository
 
-```bash
-git clone https://github.com/TA-AaryaNSah/Hostry-SVG.git
-cd Hostry-SVG
-```
+Clone your repository and navigate to the project directory.
 
 ### 2. Install Requirements
 
@@ -107,30 +104,21 @@ python main.py
 
 ---
 
-## ⚙️ Configuration Reference
+## ⚙️ Configuration Variables
 
-The following table documents recommended configuration names. The application must explicitly support these names for them to work.
+The following are recommended configuration names. The application must explicitly support these names for them to work.
 
 | Variable | Description | Example |
 |---|---|---|
 | `API_ID` | Telegram API ID | `12345678` |
 | `API_HASH` | Telegram API hash | `your_api_hash` |
-| `BOT_TOKEN` | Telegram bot token | `123456:ABC-XYZ` |
+| `BOT_TOKEN` | Telegram bot token | `your_bot_token` |
 | `MONGO_URI` | MongoDB connection URI | `mongodb+srv://...` |
 | `WEB_URL` | Public base URL | `https://your-app.example.com` |
 | `ADMIN_ID` | Administrator Telegram user ID | `123456789` |
 | `PORT` | HTTP server port | `8080` |
 
-### Configuration Notes
-
-- `API_ID` and `API_HASH` are obtained from Telegram.
-- `BOT_TOKEN` is obtained from BotFather.
-- `MONGO_URI` must point to an accessible MongoDB database.
-- `WEB_URL` should match the public URL used to access the application.
-- `ADMIN_ID` should contain the authorized administrator's Telegram user ID.
-- `PORT` should use the port assigned by the hosting platform when required.
-
-**Important:** Check `main.py` and `database.py` for the actual configuration names. These names are not guaranteed to match the current source code.
+**Note:** Check `main.py` and `database.py` for the actual configuration names. These names are not guaranteed to match the current source code.
 
 Never publish real credentials in your public repository.
 
@@ -152,7 +140,7 @@ Never publish real credentials in your public repository.
 | `/setbin <channel_id>` | Configure the file-storage channel. |
 | `/addfsub <channel_id> <invite_link>` | Add a force-subscription channel. |
 
-The application has been described as supporting up to five force-subscription channels. Confirm this limit in the current source code.
+The application has been described as supporting up to five force-subscription channels. Confirm this limit in the source code.
 
 ### Command Examples
 
@@ -169,8 +157,6 @@ The application has been described as supporting up to five force-subscription c
 ```
 
 Replace the example values with your actual channel ID and invite link.
-
-The bot needs the appropriate channel permissions for the relevant operations.
 
 ---
 
@@ -202,7 +188,7 @@ These are example URL formats. Actual URLs depend on the running application and
 
 <div align="center">
 
-[![Deploy on Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?name=Hostry-SVG&type=git&repository=TA-AaryaNSah%2FHostry-SVG&branch=main)
+[![Deploy on Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy)
 
 </div>
 
@@ -210,30 +196,21 @@ These are example URL formats. Actual URLs depend on the running application and
 
 1. Click the Deploy on Koyeb button.
 2. Connect your GitHub account.
-3. Select the repository and branch.
+3. Select your repository and branch.
 4. Configure the required application settings.
 5. Configure the build and run commands.
 6. Deploy the application.
 7. Check the runtime logs.
 
-### Run Command
+**Run Command:**
 
 ```bash
 python main.py
 ```
 
-Use this command if `main.py` starts both the Telegram bot and the streaming server.
+Use this command if `main.py` starts both the Telegram bot and streaming server.
 
-### Deployment Checklist
-
-- [ ] Configure Telegram credentials.
-- [ ] Configure MongoDB access.
-- [ ] Set the correct public application URL.
-- [ ] Ensure the web server binds to the assigned port.
-- [ ] Verify that the bot starts successfully.
-- [ ] Test a generated streaming link.
-
-Documentation: [Koyeb Git Deployment](https://www.koyeb.com/docs/build-and-deploy/deploy-with-git)
+Documentation: [Koyeb Deployment Guide](https://www.koyeb.com/docs/build-and-deploy/deploy-with-git)
 
 ---
 
@@ -241,7 +218,7 @@ Documentation: [Koyeb Git Deployment](https://www.koyeb.com/docs/build-and-deplo
 
 <div align="center">
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/TA-AaryaNSah/Hostry-SVG)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
 </div>
 
@@ -249,30 +226,19 @@ Documentation: [Koyeb Git Deployment](https://www.koyeb.com/docs/build-and-deplo
 
 1. Click the Deploy to Render button.
 2. Connect your GitHub account.
-3. Select the repository.
-4. Configure the service.
-5. Configure the required application settings.
-6. Set the correct Python start command.
-7. Deploy the service.
-8. Inspect the runtime logs.
+3. Select your repository.
+4. Configure the service and required settings.
+5. Set the correct Python start command.
+6. Deploy the service.
+7. Inspect the runtime logs.
 
-### Start Command
+**Start Command:**
 
 ```bash
 python main.py
 ```
 
 Use this command if `main.py` starts the complete application.
-
-### Deployment Checklist
-
-- [ ] Configure Telegram credentials.
-- [ ] Configure MongoDB access.
-- [ ] Check the Python dependencies.
-- [ ] Confirm the correct start command.
-- [ ] Configure the HTTP port.
-- [ ] Verify that the Telegram bot is online.
-- [ ] Test the streaming and download endpoints.
 
 Documentation: [Render Documentation](https://render.com/docs)
 
@@ -318,14 +284,8 @@ The exact workflow depends on the implementation and configuration.
 
 - Check the runtime logs.
 - Confirm that `main.py` starts the Telegram bot.
-- Verify the Telegram bot token.
+- Verify the bot token.
 - Ensure the hosting service remains running.
-
-### Website Does Not Open
-
-- Confirm that the web server binds to the correct interface and port.
-- Check the service's HTTP configuration.
-- Verify that the application exposes the expected routes.
 
 ---
 
@@ -337,7 +297,7 @@ The exact workflow depends on the implementation and configuration.
 - Give the bot only the channel permissions it needs.
 - Use HTTPS for public links.
 - Avoid publishing private files or sensitive links.
-- Distribute only content you have permission to share.
+- Share only content you are authorized to distribute.
 
 ---
 
@@ -346,12 +306,10 @@ The exact workflow depends on the implementation and configuration.
 Contributions, bug reports, and suggestions are welcome.
 
 1. Fork the repository.
-2. Create a new branch.
+2. Create a branch.
 3. Make your changes.
 4. Test your changes.
 5. Submit a pull request.
-
-Report issues through [GitHub Issues](https://github.com/TA-AaryaNSah/Hostry-SVG/issues).
 
 ---
 
@@ -359,13 +317,11 @@ Report issues through [GitHub Issues](https://github.com/TA-AaryaNSah/Hostry-SVG
 
 Check the repository for an applicable license before redistributing or modifying the project.
 
-If no license file is present, do not assume that unrestricted redistribution is permitted.
-
 ---
 
 <div align="center">
 
-# ⭐ 
+# ⭐ File-2-Link
 
 **Upload • Link • Stream**
 
