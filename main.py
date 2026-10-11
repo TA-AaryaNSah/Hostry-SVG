@@ -21,11 +21,11 @@ from pyrogram.errors import UserNotParticipant
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # --- CONFIGURATIONS ---
-API_ID = 32541562
+API_ID = 1000000
 API_HASH = "e37e4432298d5a5eb4a6e32c18804283"
-BOT_TOKEN = "8932447404:AAEnctZD5fzy90BDIVlqV1mmjXnyNb5qoxg"
-MONGO_URI = "mongodb+srv://aaryansah954:QgDQRgyD7VUa7Eho@cluster0.wjo9zfm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-WEB_URL = "https://www.f2l.xalfh.dpdns.org" # Ensure no trailing slash
+BOT_TOKEN = "BOT_TOKEN_PASTE_HERE"
+MONGO_URI = "MONGO_DB_CLUSTER_URL"
+WEB_URL = "RENDER_OR_KOYEB_URL" # Ensure no trailing slash
 ADMIN_ID = 8676822109
 PORT = int(os.environ.get("PORT", 8080))
 
